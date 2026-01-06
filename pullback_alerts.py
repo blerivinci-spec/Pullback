@@ -83,11 +83,15 @@ def estimate_payoff(price, strike, recovery):
 # ----------------------------
 
 def send_email_report(df, subject):
-    sender = "pullback.alerts@gmail.com"
-    receiver = "YOUR_EMAIL@gmail.com"
-    app_password = "YOUR_GMAIL_APP_PASSWORD"
+    import os
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
 
-    # Convert DataFrame to HTML (NO borders here)
+    sender = os.environ["GMAIL_USER"]
+    receiver = os.environ["GMAIL_RECEIVER"]
+    app_password = os.environ["GMAIL_APP_PASSWORD"]
+
     html_table = df.to_html(index=False, justify="center")
 
     html_body = f"""
@@ -117,9 +121,6 @@ def send_email_report(df, subject):
     <body>
         <p><b>Daily Pullback Alert Report</b></p>
         {html_table}
-        <p style="font-size:12px;color:#666;">
-            Generated automatically via GitHub Actions.
-        </p>
     </body>
     </html>
     """
@@ -128,12 +129,12 @@ def send_email_report(df, subject):
     msg["From"] = sender
     msg["To"] = receiver
     msg["Subject"] = subject
-
     msg.attach(MIMEText(html_body, "html"))
 
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
         server.login(sender, app_password)
         server.sendmail(sender, receiver, msg.as_string())
+
 
 # ----------------------------
 # CORE SCAN
