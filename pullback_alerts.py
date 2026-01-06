@@ -19,8 +19,8 @@ top_stocks = [
 spy_symbol = "SPY"
 
 # Pullback thresholds (% drop)
-pullback_thresholds_stocks = {1: 0.05, 7: 0.10, 15: 0.20, 30: 0.30}  # daily + multi-day
-pullback_thresholds_spy = {1: 0.025, 7: 0.051, 15: 0.10, 30: 0.15}    # daily + multi-day
+pullback_thresholds_stocks = {1: 0.015, 7: 0.110, 15: 0.20, 30: 0.130}  # daily + multi-day
+pullback_thresholds_spy = {1: 0.0125, 7: 0.0151, 15: 0.10, 30: 0.015}    # daily + multi-day
 
 # LEAP expiry in months
 leap_expiry_months_stocks = {1: 12, 7: 12, 15: 18, 30: 24}
