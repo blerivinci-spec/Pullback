@@ -68,15 +68,54 @@ def estimate_payoff(current_price, strike, recovery_pct):
 
 def send_email_report(df, sender_email, sender_password, receiver_email=None):
     if not receiver_email:
-        receiver_email = sender_email  # fallback to self
+        receiver_email = sender_email
 
-    msg = MIMEMultipart()
+    msg = MIMEMultipart("alternative")
     msg["From"] = sender_email
     msg["To"] = receiver_email
     msg["Subject"] = "Daily Pullback Alert"
 
-    body = df.to_string(index=False)
-    msg.attach(MIMEText(body, "plain"))
+    # Convert DataFrame to HTML table
+    html_table = df.to_html(
+        index=False,
+        border=1,
+        justify="center",
+        classes="dataframe"
+    )
+
+    html_body = f"""
+    <html>
+    <head>
+        <style>
+            body {{
+                font-family: Arial, sans-serif;
+                font-size: 13px;
+            }}
+            table {{
+                border-collapse: collapse;
+                width: 100%;
+            }}
+            th {{
+                background-color: #f2f2f2;
+                border: 1px solid #999;
+                padding: 6px;
+                text-align: center;
+            }}
+            td {{
+                border: 1px solid #999;
+                padding: 6px;
+                text-align: center;
+            }}
+        </style>
+    </head>
+    <body>
+        <h3>📉 Daily Pullback Alert</h3>
+        {html_table}
+    </body>
+    </html>
+    """
+
+    msg.attach(MIMEText(html_body, "html"))
 
     server = smtplib.SMTP("smtp.gmail.com", 587)
     server.starttls()
@@ -85,6 +124,7 @@ def send_email_report(df, sender_email, sender_password, receiver_email=None):
     server.quit()
 
     print(f"📧 Email successfully sent to {receiver_email}")
+
 
 
 def process_symbol(symbol, thresholds, is_spy=False):
