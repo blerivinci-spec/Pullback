@@ -20,14 +20,14 @@ top_stocks = [
 
 spy_symbol = "SPY"
 
-pullback_thresholds_stocks = {1: 0.05, 7: 0.10, 15: 0.20, 30: 0.30}
-pullback_thresholds_spy = {1: 0.025, 7: 0.051, 15: 0.10, 30: 0.15}
+pullback_thresholds_stocks = {1: 0.05, 7: 0.10, 15: 0.20, 30: 0.30, 100: 0.50}
+pullback_thresholds_spy = {1: 0.025, 7: 0.051, 15: 0.10, 30: 0.15, 100: 0.30}
 
-leap_expiry_months_stocks = {1: 12, 7: 12, 15: 18, 30: 24}
-leap_expiry_months_spy = {1: 12, 7: 12, 15: 18, 30: 24}
+leap_expiry_months_stocks = {1: 12, 7: 12, 15: 18, 30: 24, 100: 30}
+leap_expiry_months_spy = {1: 12, 7: 12, 15: 18, 30: 24, 100: 30}
 
-recovery_map_stocks = {1: 0.10, 7: 0.20, 15: 0.40, 30: 0.60}
-recovery_map_spy = {1: 0.05, 7: 0.10, 15: 0.20, 30: 0.30}
+recovery_map_stocks = {1: 0.10, 7: 0.20, 15: 0.40, 30: 0.60, 100: 0.7}
+recovery_map_spy = {1: 0.05, 7: 0.10, 15: 0.20, 30: 0.30, 100: 0.5}
 
 # ----------------------------
 # DATA HELPERS
