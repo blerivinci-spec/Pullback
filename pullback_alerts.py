@@ -46,15 +46,18 @@ recovery_map_spy = {1: 0.05, 7: 0.10, 15: 0.20, 30: 0.30}
 # ----------------------------
 
 def get_sp500_symbols():
-    """Fetch current S&P 500 constituents"""
+    """Fetch current S&P 500 constituents. If parser missing, return empty list."""
     try:
-        table = pd.read_html("https://en.wikipedia.org/wiki/List_of_S%26P_500_companies")
+        table = pd.read_html(
+            "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies",
+            flavor="lxml"  # specify parser
+        )
         df = table[0]
         symbols = df["Symbol"].tolist()
         symbols = [s.replace(".", "-") for s in symbols]
         return symbols
-    except Exception as e:
-        print("⚠️ Failed to fetch S&P 500 list:", e)
+    except (ImportError, ValueError) as e:
+        print("⚠️ Could not fetch S&P 500 list (missing parser or network issue). Skipping S&P 500 scan.")
         return []
 
 def calculate_pullback(data, period):
@@ -104,7 +107,7 @@ def send_email_report(df, sender, password, receiver=None):
                 border: 1px solid #999;
                 padding: 6px 8px;
                 text-align: center;
-                background-color: #f2f2f2;   /* header shaded */
+                background-color: #f2f2f2;
                 font-weight: bold;
             }}
             td {{
@@ -130,8 +133,6 @@ def send_email_report(df, sender, password, receiver=None):
         server.starttls()
         server.login(sender, password)
         server.sendmail(sender, receiver, msg.as_string())
-
-
 
 # ----------------------------
 # CORE SCAN
@@ -178,7 +179,6 @@ def process_symbol(symbol, thresholds, group, is_spy=False):
 
     return alerts
 
-
 # ----------------------------
 # MAIN
 # ----------------------------
@@ -194,10 +194,11 @@ def main():
         alerts += process_symbol(s, pullback_thresholds_stocks, "Top 15")
 
     # S&P 500
-    sp500 = set(get_sp500_symbols()) - set(top_stocks) - {spy_symbol}
-    for s in sp500:
+    sp500_symbols = set(get_sp500_symbols()) - set(top_stocks) - {spy_symbol}
+    for s in sp500_symbols:
         alerts += process_symbol(s, pullback_thresholds_stocks, "S&P 500")
 
+    # Create DataFrame
     df = pd.DataFrame(alerts)
     if df.empty:
         df = pd.DataFrame([{
@@ -214,10 +215,11 @@ def main():
     df.sort_values(["Period (days)", "Group", "Symbol"], inplace=True)
     df.reset_index(drop=True, inplace=True)
 
+    # Send email
     send_email_report(
         df,
-        os.environ["EMAIL_USER"],
-        os.environ["EMAIL_PASS"],
+        os.environ.get("EMAIL_USER"),
+        os.environ.get("EMAIL_PASS"),
         os.getenv("RECEIVER_EMAIL")
     )
 
