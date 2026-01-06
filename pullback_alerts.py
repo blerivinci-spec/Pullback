@@ -6,11 +6,11 @@ import os
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from datetime import date
 
 # ----------------------------
 # CONFIGURATION
 # ----------------------------
+
 top_stocks = [
     "AAPL", "MSFT", "AMZN", "TSLA", "GOOGL", "NVDA", "META",
     "BRK-B", "UNH", "V", "JNJ", "KO", "PEP", "PG", "DIS"
@@ -19,10 +19,21 @@ top_stocks = [
 spy_symbol = "SPY"
 
 # Pullback thresholds (% drop)
-pullback_thresholds_stocks = {1: 0.05, 7: 0.10, 15: 0.20, 30: 0.30}  # daily + multi-day
-pullback_thresholds_spy = {1: 0.025, 7: 0.051, 15: 0.10, 30: 0.15}    # daily + multi-day
+pullback_thresholds_stocks = {
+    1: 0.05,   # daily
+    7: 0.10,
+    15: 0.20,
+    30: 0.30
+}
 
-# LEAP expiry in months
+pullback_thresholds_spy = {
+    1: 0.025,  # daily
+    7: 0.051,
+    15: 0.10,
+    30: 0.15
+}
+
+# LEAP expiry (months)
 leap_expiry_months_stocks = {1: 12, 7: 12, 15: 18, 30: 24}
 leap_expiry_months_spy = {1: 12, 7: 12, 15: 18, 30: 24}
 
@@ -31,204 +42,146 @@ recovery_map_stocks = {1: 0.10, 7: 0.20, 15: 0.40, 30: 0.60}
 recovery_map_spy = {1: 0.05, 7: 0.10, 15: 0.20, 30: 0.30}
 
 # ----------------------------
-# FUNCTIONS
+# DATA HELPERS
 # ----------------------------
+
+def get_sp500_symbols():
+    """Fetch current S&P 500 constituents"""
+    try:
+        table = pd.read_html("https://en.wikipedia.org/wiki/List_of_S%26P_500_companies")
+        df = table[0]
+        symbols = df["Symbol"].tolist()
+        symbols = [s.replace(".", "-") for s in symbols]
+        return symbols
+    except Exception as e:
+        print("⚠️ Failed to fetch S&P 500 list:", e)
+        return []
+
 def calculate_pullback(data, period):
     if period == 1:
-        # daily pullback: previous close -> today close
-        pct_drop = (data['Close'].shift(1) - data['Close']) / data['Close'].shift(1)
-    else:
-        max_price = data['Close'].rolling(window=period, min_periods=1).max()
-        pct_drop = (max_price - data['Close']) / max_price
-    return pct_drop
+        return (data["Close"].shift(1) - data["Close"]) / data["Close"].shift(1)
+    max_price = data["Close"].rolling(window=period, min_periods=1).max()
+    return (max_price - data["Close"]) / max_price
 
-def suggest_leap_strike(current_price, pct_drop, is_spy=False):
+def suggest_leap_strike(price, pullback, is_spy):
     if is_spy:
-        if pct_drop < 0.05:
-            return round(current_price, 1)
-        elif pct_drop < 0.10:
-            return round(current_price * 1.02, 1)
-        else:
-            return round(current_price * 1.05, 1)
-    else:
-        if pct_drop < 0.10:
-            return round(current_price, 1)
-        elif pct_drop < 0.20:
-            return round(current_price * 1.05, 1)
-        else:
-            return round(current_price * 1.10, 1)
+        return round(price * (1.02 if pullback >= 0.05 else 1.0), 1)
+    if pullback < 0.10:
+        return round(price, 1)
+    elif pullback < 0.20:
+        return round(price * 1.05, 1)
+    return round(price * 1.10, 1)
 
-def suggest_expiry(period, is_spy=False):
-    return (leap_expiry_months_spy if is_spy else leap_expiry_months_stocks).get(period, 12)
+def suggest_expiry(period, is_spy):
+    return (leap_expiry_months_spy if is_spy else leap_expiry_months_stocks)[period]
 
-def estimate_payoff(current_price, strike, recovery_pct):
-    target_price = current_price * (1 + recovery_pct)
-    intrinsic_value = max(0, target_price - strike)
-    return intrinsic_value
+def estimate_payoff(price, strike, recovery):
+    return max(0, price * (1 + recovery) - strike)
 
-def send_email_report(df, sender_email, sender_password, receiver_email=None):
-    if not receiver_email:
-        receiver_email = sender_email
+# ----------------------------
+# EMAIL
+# ----------------------------
+
+def send_email_report(df, sender, password, receiver=None):
+    if receiver is None:
+        receiver = sender
+
+    html = df.to_html(index=False, border=1, justify="center")
 
     msg = MIMEMultipart("alternative")
-    msg["From"] = sender_email
-    msg["To"] = receiver_email
-    msg["Subject"] = "Daily Pullback Alert"
+    msg["Subject"] = "📉 Daily Pullback Alert"
+    msg["From"] = sender
+    msg["To"] = receiver
+    msg.attach(MIMEText(html, "html"))
 
-    # Convert DataFrame to HTML table
-    html_table = df.to_html(
-        index=False,
-        border=1,
-        justify="center",
-        classes="dataframe"
-    )
+    with smtplib.SMTP("smtp.gmail.com", 587) as server:
+        server.starttls()
+        server.login(sender, password)
+        server.sendmail(sender, receiver, msg.as_string())
 
-    html_body = f"""
-    <html>
-    <head>
-        <style>
-            body {{
-                font-family: Arial, sans-serif;
-                font-size: 13px;
-            }}
-            table {{
-                border-collapse: collapse;
-                width: 100%;
-            }}
-            th {{
-                background-color: #f2f2f2;
-                border: 1px solid #999;
-                padding: 6px;
-                text-align: center;
-            }}
-            td {{
-                border: 1px solid #999;
-                padding: 6px;
-                text-align: center;
-            }}
-        </style>
-    </head>
-    <body>
-        <h3>📉 Daily Pullback Alert</h3>
-        {html_table}
-    </body>
-    </html>
-    """
+# ----------------------------
+# CORE SCAN
+# ----------------------------
 
-    msg.attach(MIMEText(html_body, "html"))
-
-    server = smtplib.SMTP("smtp.gmail.com", 587)
-    server.starttls()
-    server.login(sender_email, sender_password)
-    server.sendmail(sender_email, receiver_email, msg.as_string())
-    server.quit()
-
-    print(f"📧 Email successfully sent to {receiver_email}")
-
-
-
-def process_symbol(symbol, thresholds, is_spy=False):
+def process_symbol(symbol, thresholds, group, is_spy=False):
     try:
         data = yf.download(symbol, period="1y", auto_adjust=True, progress=False)
     except Exception:
         return []
+
     data.dropna(inplace=True)
     if data.empty:
         return []
 
     alerts = []
+    price = data["Close"].iloc[-1].item()
 
     for period, threshold in thresholds.items():
-        data[f'pullback_{period}d'] = calculate_pullback(data, period)
-        # take the latest value
-        try:
-            current_pullback = float(data[f'pullback_{period}d'].iloc[-1])
-        except Exception:
+        pullback = calculate_pullback(data, period).iloc[-1]
+        if pd.isna(pullback) or pullback < threshold:
             continue
 
-        # ensure pullback is non-negative (some edge cases)
-        current_pullback = max(0.0, current_pullback)
+        strike = suggest_leap_strike(price, pullback, is_spy)
+        expiry = suggest_expiry(period, is_spy)
+        recovery = (recovery_map_spy if is_spy else recovery_map_stocks)[period]
+        payoff = estimate_payoff(price, strike, recovery)
 
-        if current_pullback >= threshold:
-            current_price = float(data['Close'].iloc[-1])
-            strike = suggest_leap_strike(current_price, current_pullback, is_spy)
-            expiry = suggest_expiry(period, is_spy)
-            payoff = estimate_payoff(
-                current_price,
-                strike,
-                recovery_map_spy.get(period, 0.2) if is_spy else recovery_map_stocks.get(period, 0.2)
-            )
-            alerts.append({
-                "Symbol": symbol,
-                "Current Price": round(current_price, 2),
-                "Pullback %": round(current_pullback * 100, 2),
-                "Period (days)": period,
-                "Suggested LEAP Strike": strike,
-                "Suggested Expiry (months)": expiry,
-                "Estimated Payoff (1yr recovery)": round(payoff, 2)
-            })
+        alerts.append({
+            "Group": group,
+            "Symbol": symbol,
+            "Current Price": round(price, 2),
+            "Pullback %": round(pullback * 100, 2),
+            "Period (days)": period,
+            "Suggested LEAP Strike": strike,
+            "Suggested Expiry (months)": expiry,
+            "Estimated Payoff (1yr recovery)": round(payoff, 2)
+        })
+
     return alerts
 
 # ----------------------------
 # MAIN
 # ----------------------------
+
 def main():
-    all_alerts = []
+    alerts = []
 
-    # Process SPY first
-    all_alerts.extend(
-        process_symbol(spy_symbol, pullback_thresholds_spy, is_spy=True)
-    )
+    # SPY
+    alerts += process_symbol(spy_symbol, pullback_thresholds_spy, "SPY", is_spy=True)
 
-    # Process top stocks
-    for stock in top_stocks:
-        all_alerts.extend(
-            process_symbol(stock, pullback_thresholds_stocks, is_spy=False)
-        )
+    # Top 15
+    for s in top_stocks:
+        alerts += process_symbol(s, pullback_thresholds_stocks, "Top 15")
 
-    # Create DataFrame
-    alerts_df = pd.DataFrame(all_alerts)
+    # S&P 500
+    sp500 = set(get_sp500_symbols()) - set(top_stocks) - {spy_symbol}
+    for s in sp500:
+        alerts += process_symbol(s, pullback_thresholds_stocks, "S&P 500")
 
-    # ALWAYS send an email (even if no alerts)
-    if alerts_df.empty:
-        alerts_df = pd.DataFrame([{
+    df = pd.DataFrame(alerts)
+    if df.empty:
+        df = pd.DataFrame([{
+            "Group": "-",
             "Symbol": "-",
             "Current Price": "-",
             "Pullback %": "-",
             "Period (days)": "-",
             "Suggested LEAP Strike": "-",
             "Suggested Expiry (months)": "-",
-            "Estimated Payoff (1yr recovery)": "No pullback alerts today"
+            "Estimated Payoff (1yr recovery)": "No alerts today"
         }])
 
-    # Sort output (safe even with placeholder row)
-    alerts_df.sort_values(
-        by=["Period (days)", "Symbol"],
-        ascending=[True, True],
-        inplace=True
-    )
+    df.sort_values(["Period (days)", "Group", "Symbol"], inplace=True)
+    df.reset_index(drop=True, inplace=True)
 
-    alerts_df.reset_index(drop=True, inplace=True)
-
-    # Load email credentials
-    sender_email = os.environ.get("EMAIL_USER")
-    sender_password = os.environ.get("EMAIL_PASS")
-    receiver_email = os.getenv("RECEIVER_EMAIL")
-
-    if not sender_email or not sender_password:
-        print("EMAIL_USER and EMAIL_PASS environment variables must be set.")
-        return
-
-    # Send email
     send_email_report(
-        alerts_df,
-        sender_email,
-        sender_password,
-        receiver_email
+        df,
+        os.environ["EMAIL_USER"],
+        os.environ["EMAIL_PASS"],
+        os.getenv("RECEIVER_EMAIL")
     )
 
-    print("📧 Daily email sent successfully")
-
+    print("✅ Daily pullback scan completed")
 
 if __name__ == "__main__":
     main()
