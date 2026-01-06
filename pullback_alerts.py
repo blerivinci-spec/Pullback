@@ -20,7 +20,7 @@ top_stocks = [
 
 spy_symbol = "SPY"
 
-pullback_thresholds_stocks = {1: 0.005, 7: 0.010, 15: 0.120, 30: 0.130}
+pullback_thresholds_stocks = {1: 0.05, 7: 0.10, 15: 0.20, 30: 0.30}
 pullback_thresholds_spy = {1: 0.025, 7: 0.051, 15: 0.10, 30: 0.15}
 
 leap_expiry_months_stocks = {1: 12, 7: 12, 15: 18, 30: 24}
@@ -34,26 +34,27 @@ recovery_map_spy = {1: 0.05, 7: 0.10, 15: 0.20, 30: 0.30}
 # ----------------------------
 
 def get_sp500_symbols():
-    """Scrape S&P 500 symbols from stockanalysis.com."""
-    url = "https://stockanalysis.com/list/sp-500-stocks/"
+    """Scrape S&P 500 symbols from slickcharts.com (works without lxml)."""
+    url = "https://www.slickcharts.com/sp500"
     try:
         response = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
         soup = BeautifulSoup(response.text, "html.parser")
-        symbols = []
 
-        # The table rows with symbols
+        # The table with symbols is the first <table> on slickcharts
         table = soup.find("table")
+        symbols = []
         if table:
-            for row in table.find_all("tr")[1:]:  # skip header
+            for row in table.find_all("tr")[1:]:
                 cols = row.find_all("td")
-                if cols:
-                    symbol = cols[0].text.strip()
-                    symbol = symbol.replace(".", "-")  # BRK.B => BRK-B
+                if len(cols) >= 3:
+                    symbol = cols[2].text.strip()
+                    # Slickcharts uses '.' for BRK.B; convert to Yahoo format
+                    symbol = symbol.replace(".", "-")
                     symbols.append(symbol)
         return symbols
 
     except Exception as e:
-        print("⚠️ Failed to scrape StockAnalysis S&P 500:", e)
+        print("⚠️ Failed to scrape Slickcharts S&P 500:", e)
         return []
 
 def calculate_pullback(data, period):
