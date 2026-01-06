@@ -34,27 +34,26 @@ recovery_map_spy = {1: 0.05, 7: 0.10, 15: 0.20, 30: 0.30}
 # ----------------------------
 
 def get_sp500_symbols():
-    """Scrape S&P 500 symbols from slickcharts.com (works without lxml)."""
-    url = "https://www.slickcharts.com/sp500"
+    """Scrape S&P 500 symbols from stockanalysis.com."""
+    url = "https://stockanalysis.com/list/sp-500-stocks/"
     try:
         response = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
         soup = BeautifulSoup(response.text, "html.parser")
-
-        # The table with symbols is the first <table> on slickcharts
-        table = soup.find("table")
         symbols = []
+
+        # The table rows with symbols
+        table = soup.find("table")
         if table:
-            for row in table.find_all("tr")[1:]:
+            for row in table.find_all("tr")[1:]:  # skip header
                 cols = row.find_all("td")
-                if len(cols) >= 3:
-                    symbol = cols[2].text.strip()
-                    # Slickcharts uses '.' for BRK.B; convert to Yahoo format
-                    symbol = symbol.replace(".", "-")
+                if cols:
+                    symbol = cols[0].text.strip()
+                    symbol = symbol.replace(".", "-")  # BRK.B => BRK-B
                     symbols.append(symbol)
         return symbols
 
     except Exception as e:
-        print("⚠️ Failed to scrape Slickcharts S&P 500:", e)
+        print("⚠️ Failed to scrape StockAnalysis S&P 500:", e)
         return []
 
 def calculate_pullback(data, period):
