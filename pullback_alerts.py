@@ -117,8 +117,13 @@ def process_symbol(symbol, thresholds, group, is_spy=False):
     price = data["Close"].iloc[-1].item()
 
     for period, threshold in thresholds.items():
-        pullback = calculate_pullback(data, period).iloc[-1]
-        if pd.isna(pullback) or pullback < threshold:
+        pullback_series = calculate_pullback(data, period)
+        if pullback_series.empty:
+            continue
+
+        pullback = pullback_series.iloc[-1].item()
+
+        if np.isnan(pullback) or pullback < threshold:
             continue
 
         strike = suggest_leap_strike(price, pullback, is_spy)
@@ -138,6 +143,7 @@ def process_symbol(symbol, thresholds, group, is_spy=False):
         })
 
     return alerts
+
 
 # ----------------------------
 # MAIN
