@@ -2,11 +2,8 @@ name: Daily Pullback Alert
 
 on:
   schedule:
-    - cron: '0 6 * * *'
+    - cron: '0 11 * * *'
   workflow_dispatch:
-
-env:
-  TZ: America/New_York
 
 jobs:
   run-script:
