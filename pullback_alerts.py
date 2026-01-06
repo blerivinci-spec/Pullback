@@ -66,19 +66,26 @@ def estimate_payoff(current_price, strike, recovery_pct):
     intrinsic_value = max(0, target_price - strike)
     return intrinsic_value
 
-def send_email_report(df, sender_email, sender_password, receiver_email):
-    html_table = df.to_html(index=False)
-    msg = MIMEMultipart("alternative")
-    report_date = date.today().isoformat()
-    msg["Subject"] = f"Daily Pullback Alert — {report_date}"
+def send_email_report(df, sender_email, sender_password, receiver_email=None):
+    if not receiver_email:
+        receiver_email = sender_email  # fallback to self
+
+    msg = MIMEMultipart()
     msg["From"] = sender_email
     msg["To"] = receiver_email
-    part = MIMEText(html_table, "html")
-    msg.attach(part)
+    msg["Subject"] = "Daily Pullback Alert"
 
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-        server.login(sender_email, sender_password)
-        server.sendmail(sender_email, receiver_email, msg.as_string())
+    body = df.to_string(index=False)
+    msg.attach(MIMEText(body, "plain"))
+
+    server = smtplib.SMTP("smtp.gmail.com", 587)
+    server.starttls()
+    server.login(sender_email, sender_password)
+    server.sendmail(sender_email, receiver_email, msg.as_string())
+    server.quit()
+
+    print(f"📧 Email successfully sent to {receiver_email}")
+
 
 def process_symbol(symbol, thresholds, is_spy=False):
     try:
@@ -151,7 +158,7 @@ def main():
     # Send email using environment variables (set in GitHub Actions secrets)
     sender_email = os.environ.get("EMAIL_USER")
     sender_password = os.environ.get("EMAIL_PASS")
-    receiver_email = os.environ.get("RECEIVER_EMAIL", sender_email)
+    receiver_email = os.getenv("RECEIVER_EMAIL")  # may be None
 
     if not sender_email or not sender_password:
         print("EMAIL_USER and EMAIL_PASS environment variables must be set to send email.")
