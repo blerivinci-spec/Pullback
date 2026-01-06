@@ -175,45 +175,60 @@ def process_symbol(symbol, thresholds, is_spy=False):
 def main():
     all_alerts = []
 
-    # Process SPY
-    all_alerts.extend(process_symbol(spy_symbol, pullback_thresholds_spy, is_spy=True))
+    # Process SPY first
+    all_alerts.extend(
+        process_symbol(spy_symbol, pullback_thresholds_spy, is_spy=True)
+    )
 
     # Process top stocks
     for stock in top_stocks:
-        all_alerts.extend(process_symbol(stock, pullback_thresholds_stocks, is_spy=False))
+        all_alerts.extend(
+            process_symbol(stock, pullback_thresholds_stocks, is_spy=False)
+        )
 
+    # Create DataFrame
     alerts_df = pd.DataFrame(all_alerts)
 
+    # ALWAYS send an email (even if no alerts)
     if alerts_df.empty:
-    alerts_df = pd.DataFrame([{
-        "Symbol": "-",
-        "Current Price": "-",
-        "Pullback %": "-",
-        "Period (days)": "-",
-        "Suggested LEAP Strike": "-",
-        "Suggested Expiry (months)": "-",
-        "Estimated Payoff (1yr recovery)": "No pullback alerts today"
-    }])
+        alerts_df = pd.DataFrame([{
+            "Symbol": "-",
+            "Current Price": "-",
+            "Pullback %": "-",
+            "Period (days)": "-",
+            "Suggested LEAP Strike": "-",
+            "Suggested Expiry (months)": "-",
+            "Estimated Payoff (1yr recovery)": "No pullback alerts today"
+        }])
 
+    # Sort output (safe even with placeholder row)
+    alerts_df.sort_values(
+        by=["Period (days)", "Symbol"],
+        ascending=[True, True],
+        inplace=True
+    )
 
-    # Sort so daily (1-day) alerts appear first, then 7, 15, 30 — and group by symbol
-    alerts_df.sort_values(by=["Period (days)", "Symbol"], ascending=[True, True], inplace=True)
-    # Reindex for clean output
     alerts_df.reset_index(drop=True, inplace=True)
 
-    print(alerts_df)
-
-    # Send email using environment variables (set in GitHub Actions secrets)
+    # Load email credentials
     sender_email = os.environ.get("EMAIL_USER")
     sender_password = os.environ.get("EMAIL_PASS")
-    receiver_email = os.getenv("RECEIVER_EMAIL")  # may be None
+    receiver_email = os.getenv("RECEIVER_EMAIL")
 
     if not sender_email or not sender_password:
-        print("EMAIL_USER and EMAIL_PASS environment variables must be set to send email.")
+        print("EMAIL_USER and EMAIL_PASS environment variables must be set.")
         return
 
-    send_email_report(alerts_df, sender_email, sender_password, receiver_email)
-    print("Email sent to", receiver_email)
+    # Send email
+    send_email_report(
+        alerts_df,
+        sender_email,
+        sender_password,
+        receiver_email
+    )
+
+    print("📧 Daily email sent successfully")
+
 
 if __name__ == "__main__":
     main()
