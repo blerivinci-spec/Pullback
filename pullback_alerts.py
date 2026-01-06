@@ -184,16 +184,16 @@ def main():
 
     alerts_df = pd.DataFrame(all_alerts)
 
-        if alerts_df.empty:
-        alerts_df = pd.DataFrame([{
-            "Symbol": "-",
-            "Current Price": "-",
-            "Pullback %": "-",
-            "Period (days)": "-",
-            "Suggested LEAP Strike": "-",
-            "Suggested Expiry (months)": "-",
-            "Estimated Payoff (1yr recovery)": "No pullback alerts today"
-        }])
+    if alerts_df.empty:
+    alerts_df = pd.DataFrame([{
+        "Symbol": "-",
+        "Current Price": "-",
+        "Pullback %": "-",
+        "Period (days)": "-",
+        "Suggested LEAP Strike": "-",
+        "Suggested Expiry (months)": "-",
+        "Estimated Payoff (1yr recovery)": "No pullback alerts today"
+    }])
 
 
     # Sort so daily (1-day) alerts appear first, then 7, 15, 30 — and group by symbol
