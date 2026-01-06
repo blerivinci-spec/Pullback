@@ -20,10 +20,10 @@ spy_symbol = "SPY"
 
 # Pullback thresholds (% drop)
 pullback_thresholds_stocks = {
-    1: 0.05,   # daily
-    7: 0.10,
-    15: 0.20,
-    30: 0.30
+    1: 0.005,   # daily
+    7: 0.010,
+    15: 0.120,
+    30: 0.130
 }
 
 pullback_thresholds_spy = {
