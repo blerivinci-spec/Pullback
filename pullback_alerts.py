@@ -82,21 +82,57 @@ def estimate_payoff(price, strike, recovery):
 # EMAIL
 # ----------------------------
 
-def send_email_report(df, sender, password, receiver=None):
-    if receiver is None:
-        receiver = sender
+def send_email_report(df, subject):
+    sender = "pullback.alerts@gmail.com"
+    receiver = "YOUR_EMAIL@gmail.com"
+    app_password = "YOUR_GMAIL_APP_PASSWORD"
 
-    html = df.to_html(index=False, border=1, justify="center")
+    # Convert DataFrame to HTML (NO borders here)
+    html_table = df.to_html(index=False, justify="center")
+
+    html_body = f"""
+    <html>
+    <head>
+        <style>
+            table {{
+                border-collapse: collapse;
+                width: 100%;
+                font-family: Arial, sans-serif;
+                font-size: 13px;
+            }}
+            th, td {{
+                border: 1px solid #999;
+                padding: 6px 8px;
+                text-align: center;
+            }}
+            th {{
+                background-color: #e6e6e6;
+                font-weight: bold;
+            }}
+            tbody tr:nth-child(odd) {{
+                background-color: #f5f5f5;
+            }}
+        </style>
+    </head>
+    <body>
+        <p><b>Daily Pullback Alert Report</b></p>
+        {html_table}
+        <p style="font-size:12px;color:#666;">
+            Generated automatically via GitHub Actions.
+        </p>
+    </body>
+    </html>
+    """
 
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = "📉 Daily Pullback Alert"
     msg["From"] = sender
     msg["To"] = receiver
-    msg.attach(MIMEText(html, "html"))
+    msg["Subject"] = subject
 
-    with smtplib.SMTP("smtp.gmail.com", 587) as server:
-        server.starttls()
-        server.login(sender, password)
+    msg.attach(MIMEText(html_body, "html"))
+
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        server.login(sender, app_password)
         server.sendmail(sender, receiver, msg.as_string())
 
 # ----------------------------
