@@ -82,19 +82,15 @@ def estimate_payoff(price, strike, recovery):
 # EMAIL
 # ----------------------------
 
-def send_email_report(df, subject):
-    import os
-    import smtplib
-    from email.mime.multipart import MIMEMultipart
-    from email.mime.text import MIMEText
+def send_email_report(df, sender, password, receiver=None):
+    if receiver is None:
+        receiver = sender
 
-    sender = os.environ["GMAIL_USER"]
-    receiver = os.environ["GMAIL_RECEIVER"]
-    app_password = os.environ["GMAIL_APP_PASSWORD"]
-
+    # Convert DataFrame to HTML WITHOUT borders
     html_table = df.to_html(index=False, justify="center")
 
-    html_body = f"""
+    # Add custom CSS: single-line border + shaded header row
+    html = f"""
     <html>
     <head>
         <style>
@@ -104,36 +100,37 @@ def send_email_report(df, subject):
                 font-family: Arial, sans-serif;
                 font-size: 13px;
             }}
-            th, td {{
+            th {{
+                border: 1px solid #999;
+                padding: 6px 8px;
+                text-align: center;
+                background-color: #f2f2f2;   /* header shaded */
+                font-weight: bold;
+            }}
+            td {{
                 border: 1px solid #999;
                 padding: 6px 8px;
                 text-align: center;
             }}
-            th {{
-                background-color: #e6e6e6;
-                font-weight: bold;
-            }}
-            tbody tr:nth-child(odd) {{
-                background-color: #f5f5f5;
-            }}
         </style>
     </head>
     <body>
-        <p><b>Daily Pullback Alert Report</b></p>
         {html_table}
     </body>
     </html>
     """
 
     msg = MIMEMultipart("alternative")
+    msg["Subject"] = "📉 Daily Pullback Alert"
     msg["From"] = sender
     msg["To"] = receiver
-    msg["Subject"] = subject
-    msg.attach(MIMEText(html_body, "html"))
+    msg.attach(MIMEText(html, "html"))
 
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-        server.login(sender, app_password)
+    with smtplib.SMTP("smtp.gmail.com", 587) as server:
+        server.starttls()
+        server.login(sender, password)
         server.sendmail(sender, receiver, msg.as_string())
+
 
 
 # ----------------------------
